@@ -1,0 +1,155 @@
+﻿using AppWithDatabase.Controller.Repositories;
+using AppWithDatabase.Model;
+using Spectre.Console;
+
+namespace AppWithDatabase.Controller;
+
+public class ConsoleApp
+{
+    private readonly SqlMeasurementRepository _repository;
+
+    public ConsoleApp(SqlMeasurementRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public void Run()
+    {
+        while (true)
+        {
+            var option = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select a [green]CRUD[/] operation to execute on table [blue]Measurements[/]")
+                    .PageSize(5)
+                    .AddChoices("Create", "Read", "Update", "Delete", "Exit"));
+
+
+            switch (option)
+            {
+                case "Create":
+                    Create().Wait();
+                    break;
+                case "Read":
+                    Read();
+                    break;
+                case "Update":
+                    Update();
+                    break;
+                case "Delete":
+                    Delete();
+                    break;
+                case "Exit":
+                    return;
+            }
+        }
+    }
+
+    public async Task Create()
+    {
+        //User prompts with values
+        var userId = AnsiConsole.Ask<int>("Enter [green]UserId[/]: ");
+        var sensorId = AnsiConsole.Ask<int>("Enter [green]SensorId[/]: ");
+        var temperature = AnsiConsole.Ask<float>("Enter [green]Temperature[/]: ");
+        AnsiConsole.Clear();
+
+        // Create a Table with the Inputted Data
+        AnsiConsole.Write(
+            new Table()
+            .AddColumn(new TableColumn("[yellow]UserId[/]").Centered())
+            .AddColumn(new TableColumn("[yellow]SensorId[/]").Centered())
+            .AddColumn(new TableColumn("[yellow]Temperature[/]").Centered())
+            .AddRow($"[green]{userId}[/]", $"[green]{sensorId}[/]", $"[green]{temperature}[/]")
+            );
+
+        //Prompt the user if they really want to insert the new data
+        var proceedWithData = AnsiConsole.Prompt(
+            new SelectionPrompt<bool> { Converter = value => value ? "[green]Yes[/]" : "[red]No[/]" }
+                .Title("Do you want to insert this data into table [blue]Measurements[/]?")
+                .AddChoices(true, false));
+        if (!proceedWithData) return;
+
+        //Create a new Measurement with the given data
+        var measurement = new Measurement(userId, sensorId, temperature);
+
+        //Insert the data
+        var result = await _repository.Create(measurement);
+        Console.WriteLine($"({result}) Measurement created successfully.");
+        Thread.Sleep(2000);
+        AnsiConsole.Clear();
+    }
+
+    public void Read()
+    {
+        var measurements = _repository.GetAll().Result.ToList();
+
+        //Show all the measurements
+        ConsoleHandler.ShowMeasurements(measurements);
+
+        //Prompt to stop reading
+        var doneReadingMeasurement = AnsiConsole.Prompt(
+            new SelectionPrompt<bool> { Converter = _ => "[green]Continue[/]" }
+                .Title("Press [blue]<enter>[/] to Continue..")
+                .AddChoices(true));
+        AnsiConsole.Clear();
+    }
+
+
+    public void Update()
+    {
+        var measurements = _repository.GetAll().Result.ToList();
+
+        ConsoleHandler.ShowMeasurements(measurements);
+
+        //prompt the user to select the table they want to update. Returns the index of the selected table.
+        var selectedTableId = ConsoleHandler.SelectTablePrompt(measurements);
+        var selectedMeasurement = measurements[selectedTableId];
+
+        //Create the updated Measurement with the users Input
+        var updatedMeasurement = ConsoleHandler.MultiSelectUpdatePrompt(selectedMeasurement);
+
+        //Table that shows original and updated table
+        ConsoleHandler.ShowChangesTable(selectedMeasurement, updatedMeasurement);
+
+        // Are you sure prompt
+        var changeMeasurement = AnsiConsole.Prompt(
+            new SelectionPrompt<bool> { Converter = value => value ? "[green]Yes[/]" : "[red]No[/]" }
+                .Title("Are you sure you want to [lime]UPDATE[/] [blue]Measurements[/]?")
+                .AddChoices(true, false));
+        if (!changeMeasurement) return;
+
+        //Update changes to database
+        _repository.Update(updatedMeasurement);
+        Console.WriteLine("Measurement updated successfully");
+        Thread.Sleep(2000);
+        AnsiConsole.Clear();
+    }
+
+
+    public void Delete()
+    {
+        //show all measurements
+        var measurements = _repository.GetAll().Result.ToList();
+        ConsoleHandler.ShowMeasurements(measurements);
+
+        //multi select prompt to get a list of tables to delete
+        var selectedMeasurementsIdList = ConsoleHandler.MultiSelectDeletePrompt(measurements);
+        if (selectedMeasurementsIdList.Count == 0) return;
+
+        //Are you sure prompt
+        var deleteMeasurement = AnsiConsole.Prompt(
+            new SelectionPrompt<bool> { Converter = value => value ? "[green]Yes[/]" : "[red]No[/]" }
+                .Title("Are you sure you want to [red]DELETE[/] the selected [blue]Measurements[/]?")
+                .AddChoices(true, false));
+        if (!deleteMeasurement) return;
+
+        //loop through all the selected measurements and delete them from the database
+        foreach (var measurement in selectedMeasurementsIdList.Select(measurementId => measurements[measurementId - 1]))
+        {
+            _repository.Delete(measurement);
+        }
+
+        Console.WriteLine($"({selectedMeasurementsIdList.Count}) Measurements deleted successfully.");
+        Thread.Sleep(2000);
+        AnsiConsole.Clear();
+    }
+}
