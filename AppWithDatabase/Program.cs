@@ -1,25 +1,25 @@
 ﻿using AppWithDatabase.Controller;
-using AppWithDatabase.Controller.Repositories;
-using Spectre.Console;
+using AppWithDatabase.Models;
 using System.Data.SqlClient;
 
 try
 {
-    // connection string
-    const string connectionString =
-        @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Measurements;Integrated Security=True;";
+    // // connection string
+    // const string connectionString =
+    //     @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Measurements;Integrated Security=True;";
+    //
+    // // Create SQL Repo
+    // var repo = new SqlMeasurementRepository(connectionString);
 
-    // Create SQL Repo
-    var repo = new SqlMeasurementRepository(connectionString);
-
-    // Create A New Console App And Pass the Repo
-    var consoleApp = new ConsoleApp(repo);
+    // Create A New Console App And Pass the DbContext
+    var db = new MeasurementsContext();
+    var consoleApp = new ConsoleApp(db);
 
     //Start All Services And Run The Console Application
 
     // StartServices().Wait(); // This sucks when developing the app....
 
-    consoleApp.Run();
+    await consoleApp.Run();
 }
 catch (SqlException e)
 {
@@ -29,11 +29,8 @@ catch (SqlException e)
 Console.WriteLine("Shutting down the application...");
 Thread.Sleep(2000);
 
-async Task StartServices()
+/*async Task StartServices()
 {
-    const string connectionString =
-        @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Measurements;Integrated Security=True;";
-
     var rand = new Random();
 
     // SQL SERVICES
@@ -76,5 +73,5 @@ async Task StartServices()
 
     Thread.Sleep(3000);
     AnsiConsole.Clear();
-}
+}*/
 

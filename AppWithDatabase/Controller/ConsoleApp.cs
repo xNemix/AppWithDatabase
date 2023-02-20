@@ -1,19 +1,18 @@
-﻿using AppWithDatabase.Controller.Repositories;
-using AppWithDatabase.Model;
+﻿using AppWithDatabase.Models;
 using Spectre.Console;
 
 namespace AppWithDatabase.Controller;
 
 public class ConsoleApp
 {
-    private readonly SqlMeasurementRepository _repository;
+    private readonly MeasurementsContext _db;
 
-    public ConsoleApp(SqlMeasurementRepository repository)
+    public ConsoleApp(MeasurementsContext dbContext)
     {
-        _repository = repository;
+        _db = dbContext;
     }
 
-    public void Run()
+    public async Task Run()
     {
         while (true)
         {
@@ -27,16 +26,16 @@ public class ConsoleApp
             switch (option)
             {
                 case "Create":
-                    Create().Wait();
+                    await Create();
                     break;
                 case "Read":
                     Read();
                     break;
                 case "Update":
-                    Update();
+                    await Update();
                     break;
                 case "Delete":
-                    Delete();
+                    await Delete();
                     break;
                 case "Exit":
                     return;
@@ -69,24 +68,31 @@ public class ConsoleApp
         if (!proceedWithData) return;
 
         //Create a new Measurement with the given data
-        var measurement = new Measurement(userId, sensorId, temperature);
+        var measurement = new Measurement()
+        {
+            UserId = userId,
+            SensorId = sensorId,
+            Temperature = temperature
+        };
 
         //Insert the data
-        var result = await _repository.Create(measurement);
-        Console.WriteLine($"({result}) Measurement created successfully.");
+        var result = await _db.AddAsync(measurement);
+        await _db.SaveChangesAsync();
+        Console.WriteLine("Measurement created successfully.");
         Thread.Sleep(2000);
         AnsiConsole.Clear();
     }
 
     public void Read()
     {
-        var measurements = _repository.GetAll().Result.ToList();
+        var measurements = _db.Measurements.ToList();
+
 
         //Show all the measurements
         ConsoleHandler.ShowMeasurements(measurements);
 
         //Prompt to stop reading
-        var doneReadingMeasurement = AnsiConsole.Prompt(
+        AnsiConsole.Prompt(
             new SelectionPrompt<bool> { Converter = _ => "[green]Continue[/]" }
                 .Title("Press [blue]<enter>[/] to Continue..")
                 .AddChoices(true));
@@ -94,17 +100,19 @@ public class ConsoleApp
     }
 
 
-    public void Update()
+    public async Task Update()
     {
-        var measurements = _repository.GetAll().Result.ToList();
+        var measurements = _db.Measurements.ToList();
 
         ConsoleHandler.ShowMeasurements(measurements);
 
         //prompt the user to select the table they want to update. Returns the index of the selected table.
         var selectedTableId = ConsoleHandler.SelectTablePrompt(measurements);
-        var selectedMeasurement = measurements[selectedTableId];
+        var selectedMeasurement = measurements.FirstOrDefault(item => item.Id == selectedTableId);
 
         //Create the updated Measurement with the users Input
+        if (selectedMeasurement == null) return;
+
         var updatedMeasurement = ConsoleHandler.MultiSelectUpdatePrompt(selectedMeasurement);
 
         //Table that shows original and updated table
@@ -118,17 +126,22 @@ public class ConsoleApp
         if (!changeMeasurement) return;
 
         //Update changes to database
-        _repository.Update(updatedMeasurement);
+        selectedMeasurement.UserId = updatedMeasurement.UserId;
+        selectedMeasurement.SensorId = updatedMeasurement.SensorId;
+        selectedMeasurement.Temperature = updatedMeasurement.Temperature;
+
+        _db.Measurements.Update(selectedMeasurement);
+        await _db.SaveChangesAsync();
         Console.WriteLine("Measurement updated successfully");
         Thread.Sleep(2000);
         AnsiConsole.Clear();
     }
 
 
-    public void Delete()
+    public async Task Delete()
     {
         //show all measurements
-        var measurements = _repository.GetAll().Result.ToList();
+        var measurements = _db.Measurements.ToList();
         ConsoleHandler.ShowMeasurements(measurements);
 
         //multi select prompt to get a list of tables to delete
@@ -145,9 +158,9 @@ public class ConsoleApp
         //loop through all the selected measurements and delete them from the database
         foreach (var measurement in selectedMeasurementsIdList.Select(measurementId => measurements[measurementId - 1]))
         {
-            _repository.Delete(measurement);
+            _db.Remove(measurement);
         }
-
+        await _db.SaveChangesAsync();
         Console.WriteLine($"({selectedMeasurementsIdList.Count}) Measurements deleted successfully.");
         Thread.Sleep(2000);
         AnsiConsole.Clear();

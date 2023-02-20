@@ -1,4 +1,5 @@
-﻿using AppWithDatabase.Model;
+﻿
+using AppWithDatabase.Models;
 using Spectre.Console;
 
 namespace AppWithDatabase.Controller;
@@ -10,40 +11,38 @@ public class ConsoleHandler
         var promptTable = new Table()
             .Alignment(Justify.Left)
             .Title("Tables")
-            .AddColumn(new TableColumn("TableNr").Centered())
+            .AddColumn(new TableColumn("Id").Centered())
             .AddColumn(new TableColumn("UserId").Centered())
             .AddColumn(new TableColumn("SensorId").Centered())
             .AddColumn(new TableColumn("Temperature").Centered());
 
-        for (var index = 0; index < measurements.Count; index++)
+        foreach (var measurement in measurements)
         {
-            var m = measurements[index];
-            var tableNr = index + 1;
-            promptTable.AddRow($"{tableNr}", $"{m.UserId}", $"{m.SensorId}", $"{m.Temperature}℃");
+
+            promptTable.AddRow($"{measurement.Id}", $"{measurement.UserId}", $"{measurement.SensorId}", $"{measurement.Temperature}");
         }
 
         // Show the Table
         AnsiConsole.Write(promptTable);
     }
 
-    public static int SelectTablePrompt(List<Measurement> measurements)
+    public static long SelectTablePrompt(List<Measurement> measurements)
     {
 
         // Build the prompt
-        var prompt = new SelectionPrompt<int>
+        var prompt = new SelectionPrompt<long>
         {
-            Converter = i => $"Table Number: [green]{i}[/]"
+            Converter = id => $"Table ID: [green]{id}[/]"
         };
         prompt.Title("Select the table to [green]Update[/]");
-        for (var index = 0; index < measurements.Count; index++)
+        foreach (var id in measurements.Select(measurement => measurement.Id))
         {
-            var tableNr = index + 1;
-            prompt.AddChoice(tableNr);
+            prompt.AddChoice(id);
         }
 
         // Show the prompt
         var selectedPromptId = AnsiConsole.Prompt(prompt);
-        return selectedPromptId - 1;
+        return selectedPromptId;
     }
 
     public static List<int> MultiSelectDeletePrompt(List<Measurement> measurements)
